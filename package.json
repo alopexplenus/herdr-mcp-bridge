@@ -1,0 +1,23 @@
+{
+  "name": "herdr-mcp-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --noEmit false",
+    "test": "vitest run",
+    "check": "tsc --noEmit",
+    "start": "node dist/src/main.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  }
+}

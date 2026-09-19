@@ -1,0 +1,19 @@
+dist
+node_modules
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Test and coverage output
+coverage
+.nyc_output
+
+# Logs and runtime files
+*.log
+*.pid
+*.pid.lock
+
