@@ -163,5 +163,9 @@ function isRecord(value: unknown): value is Record<string, any> {
 }
 
 function authorized(remoteAddress: string | undefined, allowedPeerAddress: string): boolean {
-  return remoteAddress === allowedPeerAddress || remoteAddress === `::ffff:${allowedPeerAddress}`;
+  return remoteAddress === "127.0.0.1"
+    || remoteAddress === "::1"
+    || remoteAddress === "::ffff:127.0.0.1"
+    || remoteAddress === allowedPeerAddress
+    || remoteAddress === `::ffff:${allowedPeerAddress}`;
 }

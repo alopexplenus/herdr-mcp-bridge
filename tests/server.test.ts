@@ -36,7 +36,7 @@ function request(server: http.Server, path: string, options: { method?: string; 
   });
 }
 
-test("allows requests from the configured peer", async () => {
+test("allows requests from localhost and the configured peer", async () => {
   const server = createBridgeServer(client, config);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
