@@ -1,40 +1,82 @@
 # HERDR MCP Bridge
 
-This service exposes a constrained MCP Streamable HTTP endpoint backed by the local HERDR socket.
+This service exposes a constrained MCP Streamable HTTP endpoint backed by the local HERDR socket. It is intended for a single trusted user and does not launch or manage HERDR.
 
-> **Experimental and single-user:** This project is intended for personal, trusted-local use. The bridge accepts MCP requests only from its configured trusted Nginx peer.
+## Tested Use Cases
 
-## Start
 
-Build and start the service with `npm run build && npm run start`. The process loads its configuration from the environment, binds exactly to `HERDR_LISTEN_HOST` and `HERDR_LISTEN_PORT`, and closes the HTTP server on `SIGINT` or `SIGTERM`.
+### 1. Local usage
+Run the bridge on the same machine as HERDR. The bridge listens on loopback, while the MCP client connects to `http://127.0.0.1:8787/mcp`. The client agent can run inside HERDR itself.
 
-Install dependencies first with `npm install`. Node.js 22 or later is required.
+
+```sh
+npm install
+npm run build
+
+export HERDR_SOCKET_PATH=/path/to/herdr.sock
+export HERDR_LISTEN_HOST=127.0.0.1
+export HERDR_LISTEN_PORT=8787
+npm run start
+
+```
+Configure the client's MCP server URL as:
+
+```text
+http://127.0.0.1:8787/mcp
+```
+
+`HERDR_SOCKET_PATH` must point to the socket used by the running HERDR process. The bridge accepts local requests without an additional proxy.
+
+### 2. Claude Mobile through a public HTTPS endpoint
+
+This is particularly useful because it lets you interact with your agentic setup in a seamless voice conversation while AFK.
+
+Bring your own OAuth. I tested with <https://github.com/sigbit/mcp-auth-proxy>
+```sh
+
+export HERDR_ALLOWED_PEER_ADDRESS=x.x.x.x # proxy address
+export HERDR_SOCKET_PATH=/path/to/herdr.sock
+export HERDR_LISTEN_HOST=127.0.0.1
+export HERDR_LISTEN_PORT=8787
+npm run start
+```
+
+The proxy terminates HTTPS and authenticates Claude Mobile; the bridge remains private on loopback. Configure the proxy's upstream as:
+
+```
+http://x.x.x.x:8787/mcp
+```
+
+Expose the proxy's HTTPS URL to Claude Mobile, for example:
+
+```text
+https://mcp.example.com/mcp
+```
+
+
+Do not expose port `HERDR_LISTEN_PORT` directly to the internet. The public endpoint must use HTTPS and the proxy must protect the complete `/mcp` path. The bridge has no OAuth or TLS implementation of its own.
+
+The process loads configuration from the environment and closes the HTTP server on `SIGINT` or `SIGTERM`.
 
 ## Configuration
 
-- `HERDR_ALLOWED_PEER_ADDRESS` is required and must be the exact Tailscale address of the trusted Nginx peer.
+- `HERDR_SOCKET_PATH` identifies the running HERDR Unix socket and is required when a tool is called.
+- `HERDR_ALLOWED_PEER_ADDRESS` is required. It must be the source address of the trusted remote proxy. Localhost connections are allowed regardless of this config.
 - `HERDR_PROJECTS_ROOT` defaults to `~/projects` and must remain inside `HOME`.
 - `HERDR_LISTEN_HOST` defaults to `127.0.0.1`.
 - `HERDR_LISTEN_PORT` defaults to `8787`.
 - `HERDR_MAX_READ_BYTES` defaults to `65536`.
-- HERDR responses are capped at `min(HERDR_MAX_READ_BYTES + 65536, 1048576)` bytes.
 - `HERDR_COMMAND` defaults to `herdr`.
-- `HERDR_SOCKET_PATH` identifies the running HERDR Unix socket and is required when a tool is called.
 
-The HERDR user and bridge process must have access to the same running HERDR socket. The bridge does not launch or manage HERDR.
-
-For local use, keep `HERDR_LISTEN_HOST` set to its default `127.0.0.1`. If the service is placed behind a reverse proxy or made reachable beyond the local machine, use HTTPS and protect the entire deployment with appropriate network controls. Do not send the client secret or bearer tokens over plain HTTP.
+HERDR and the bridge process must have access to the same running HERDR socket. HERDR responses are capped at `min(HERDR_MAX_READ_BYTES + 65536, 1048576)` bytes.
 
 ## Endpoints
 
-- `GET /health` returns `{ "status": "ok" }` and does not query or expose agent data.
-- `GET /health` is available for private service checks.
-- `POST /mcp` accepts MCP Streamable HTTP only from the configured peer.
+- `GET /health` returns a private service health response and does not query agent data.
+- `POST /mcp` accepts MCP Streamable HTTP requests from localhost or the configured trusted peer.
 
-The bridge does not implement OAuth. Cloudflare Access authenticates the public client connection, Nginx is the only trusted peer, and the bridge enforces the peer boundary on the private Tailscale hop.
-
-## Supported tools
+## Supported Tools
 
 `list_projects`, `list_agents`, `read_agent`, `list_requests`, `select_request_option`, `approve_request`, `deny_request`, `dismiss_request`, and `prompt_agent`.
 
-Agent reads and prompt text are bounded. Request actions validate IDs and blocked-request state through HERDR. Request option selection accepts only numeric options `1` through `99`, and when HERDR supplies a structured option list, the selected value must be listed. Approve, deny, and dismiss always send the fixed `approve`, `deny`, and `esc` actions.
+Agent reads and prompt text are bounded. Request actions validate IDs and blocked-request state through HERDR. Request option selection accepts numeric options from `1` through `99`; when HERDR supplies a structured option list, the selected value must be listed.
