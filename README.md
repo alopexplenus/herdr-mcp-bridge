@@ -77,6 +77,6 @@ HERDR and the bridge process must have access to the same running HERDR socket. 
 
 ## Supported Tools
 
-`list_projects`, `list_agents`, `read_agent`, `list_requests`, `select_request_option`, `approve_request`, `deny_request`, `dismiss_request`, and `prompt_agent`.
+`list_projects`, `list_agents`, `read_agent`, `list_requests`, `select_request_option`, `approve_request`, `deny_request`, `dismiss_request`, `prompt_agent`, and `wait_for_agent`.
 
-Agent reads and prompt text are bounded. Request actions validate IDs and blocked-request state through HERDR. Request option selection accepts numeric options from `1` through `99`; when HERDR supplies a structured option list, the selected value must be listed.
+Agent reads and prompt text are bounded. `wait_for_agent` polls status until the requested state or a bounded timeout. Agent summaries preserve technical IDs and include a `topic` field when HERDR supplies session-topic metadata. Request actions validate IDs and blocked-request state through HERDR. Request option selection accepts numeric options from `1` through `99`; when HERDR supplies a structured option list, the selected value must be listed.

@@ -8,6 +8,7 @@ export interface AgentSummary {
   status: string;
   waitingForInput: boolean;
   bridgeUptimeSeconds: number;
+  topic?: string;
   message?: string;
   metadata?: Record<string, string>;
   options?: number[];
@@ -181,6 +182,26 @@ export class HerdrClient {
     return this.#request(METHOD_NAMES.promptAgent, { target: await this.#agentTarget(agentId), text });
   }
 
+  async waitForAgent(agentId: string, status: string, timeoutMs = 30000, pollIntervalMs = 500): Promise<AgentSummary> {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 300000) {
+      throw new HerdrError("INVALID_ARGUMENT", "timeoutMs must be an integer from 100 through 300000");
+    }
+    if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 50 || pollIntervalMs > 10000) {
+      throw new HerdrError("INVALID_ARGUMENT", "pollIntervalMs must be an integer from 50 through 10000");
+    }
+    const target = nonEmpty(agentId, "agentId");
+    const desiredStatus = nonEmpty(status, "status");
+    const deadline = Date.now() + timeoutMs;
+    while (true) {
+      const agent = (await this.listAgents()).find((candidate) => candidate.id === target);
+      if (!agent) throw new HerdrError("UNKNOWN_AGENT", "HERDR agent not found");
+      if (agent.status === desiredStatus) return agent;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new HerdrError("WAIT_TIMEOUT", "HERDR agent did not reach the requested status before the timeout");
+      await new Promise((resolve) => setTimeout(resolve, Math.min(pollIntervalMs, remaining)));
+    }
+  }
+
   async #agentTarget(id: string): Promise<string> {
     const target = nonEmpty(id, "agentId");
     if (!(await this.listAgents()).some((agent) => agent.id === target)) {
@@ -218,6 +239,7 @@ function parseAgent(value: unknown, bridgeUptimeSeconds: number): AgentSummary {
   const type = typeof value.agent === "string" ? value.agent : typeof value.agent_type === "string" ? value.agent_type : typeof value.type === "string" ? value.type : "unknown";
   const waitingForInput = typeof value.waiting_for_input === "boolean" ? value.waiting_for_input : typeof value.waitingForInput === "boolean" ? value.waitingForInput : value.agent_status === "blocked";
   const message = typeof value.message === "string" ? value.message : undefined;
+  const topic = firstString(value.topic, value.session_topic, value.sessionTopic, isRecord(value.metadata) ? value.metadata.topic : undefined, isRecord(value.metadata) ? value.metadata.session_topic : undefined);
   const metadata: Record<string, string> | undefined = isRecord(value.metadata)
     ? Object.entries(value.metadata).filter(([key, item]) => key.length <= 64 && typeof item === "string" && item.length <= 256).slice(0, 16)
       .reduce<Record<string, string>>((result, [key, item]) => {
@@ -227,7 +249,11 @@ function parseAgent(value: unknown, bridgeUptimeSeconds: number): AgentSummary {
     : undefined;
   const name = typeof value.name === "string" ? value.name : id;
   const options = parseOptions(value.options) ?? parseOptions(isRecord(value.metadata) ? value.metadata.options : undefined) ?? parseMessageOptions(value.message);
-  return { id, name, type, projectId, status: value.agent_status, waitingForInput, bridgeUptimeSeconds, ...(message ? { message } : {}), ...(metadata && Object.keys(metadata).length ? { metadata } : {}), ...(options ? { options } : {}) };
+  return { id, name, type, projectId, status: value.agent_status, waitingForInput, bridgeUptimeSeconds, ...(topic ? { topic } : {}), ...(message ? { message } : {}), ...(metadata && Object.keys(metadata).length ? { metadata } : {}), ...(options ? { options } : {}) };
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === "string" && value.trim().length > 0)?.trim();
 }
 
 function parseMessageOptions(message: unknown): number[] | undefined {

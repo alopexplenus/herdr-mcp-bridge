@@ -14,6 +14,7 @@ export const TOOL_NAMES = [
   "deny_request",
   "dismiss_request",
   "prompt_agent",
+  "wait_for_agent",
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -34,4 +35,10 @@ export const toolContracts = {
   deny_request: z.object(requestId).strict(),
   dismiss_request: z.object(requestId).strict(),
   prompt_agent: z.object({ agentId: id, text: z.string().trim().min(1).max(4000) }).strict(),
+  wait_for_agent: z.object({
+    agentId: id,
+    status: id,
+    timeoutMs: z.number().int().min(100).max(300000).optional(),
+    pollIntervalMs: z.number().int().min(50).max(10000).optional(),
+  }).strict(),
 } as const;

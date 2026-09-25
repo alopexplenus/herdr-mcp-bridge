@@ -16,7 +16,7 @@ const config: BridgeConfig = {
 };
 
 describe("MCP tool contracts", () => {
-  test("exposes exactly the nine allowlisted tools", () => {
+  test("exposes exactly the ten allowlisted tools", () => {
     expect(TOOL_NAMES).toEqual([
       "list_projects",
       "list_agents",
@@ -27,6 +27,7 @@ describe("MCP tool contracts", () => {
       "deny_request",
       "dismiss_request",
       "prompt_agent",
+      "wait_for_agent",
     ]);
     expect(TOOL_NAMES.some((name) => /shell|pane|key|lifecycle/i.test(name))).toBe(false);
   });
@@ -36,7 +37,7 @@ describe("MCP tool contracts", () => {
     const server = createMcpServer({
       listAgents: async () => [], readAgent: async () => ({}), listRequests: async () => [],
       selectRequestOption: async () => ({}), approveRequest: async () => ({}), denyRequest: async () => ({}),
-      dismissRequest: async () => ({}), promptAgent: async () => ({}),
+      dismissRequest: async () => ({}), promptAgent: async () => ({}), waitForAgent: async () => ({ id: "a", name: "a", projectId: "p", type: "t", status: "idle", waitingForInput: false, bridgeUptimeSeconds: 0 }),
     }, config);
     const client = new Client({ name: "contract-test", version: "1" });
     await server.connect(serverTransport);
@@ -56,7 +57,7 @@ describe("MCP tool contracts", () => {
     const server = createMcpServer({
       listAgents: async () => [], readAgent: async () => ({}), listRequests: async () => [],
       selectRequestOption: async () => ({}), approveRequest: async () => ({}), denyRequest: async () => ({}),
-      dismissRequest: async () => ({}), promptAgent: async () => ({}),
+      dismissRequest: async () => ({}), promptAgent: async () => ({}), waitForAgent: async () => ({ id: "a", name: "a", projectId: "p", type: "t", status: "idle", waitingForInput: false, bridgeUptimeSeconds: 0 }),
     }, config);
     const client = new Client({ name: "schema-test", version: "1" });
     await server.connect(serverTransport);
@@ -110,6 +111,7 @@ describe("MCP tool contracts", () => {
       denyRequest: async () => ({}),
       dismissRequest: async () => ({}),
       promptAgent: async () => ({}),
+      waitForAgent: async () => ({ id: "a", name: "a", projectId: "p", type: "t", status: "idle", waitingForInput: false, bridgeUptimeSeconds: 0 }),
     }, config);
     await expect(handlers.read_agent({ agentId: "agent-1" })).resolves.toEqual({ agentId: "agent-1", output: '{"output', truncated: true });
   });
@@ -124,6 +126,7 @@ describe("MCP tool contracts", () => {
       denyRequest: async () => ({}),
       dismissRequest: async () => ({}),
       promptAgent: async () => ({}),
+      waitForAgent: async () => ({ id: "a", name: "a", projectId: "p", type: "t", status: "idle", waitingForInput: false, bridgeUptimeSeconds: 0 }),
     }, { ...config, maxReadBytes: 5 });
 
     const result = await handlers.read_agent({ agentId: "agent-1" });

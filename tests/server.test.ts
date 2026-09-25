@@ -16,7 +16,7 @@ const config: BridgeConfig = {
 const client = {
   listAgents: async () => [], readAgent: async () => ({}), listRequests: async () => [],
   selectRequestOption: async () => ({}), approveRequest: async () => ({}),
-  denyRequest: async () => ({}), dismissRequest: async () => ({}), promptAgent: async () => ({}),
+    denyRequest: async () => ({}), dismissRequest: async () => ({}), promptAgent: async () => ({}), waitForAgent: async () => ({ id: "a", name: "a", projectId: "p", type: "t", status: "idle", waitingForInput: false, bridgeUptimeSeconds: 0 }),
 };
 
 function request(server: http.Server, path: string, options: { method?: string; body?: string } = {}): Promise<number> {

@@ -22,7 +22,7 @@ describe("HerdrClient", () => {
     const { client, requests } = fakeClient({
       "agent.list": {
         agents: [
-          { id: "a1", name: "builder", agent: "coding", agent_type: "wrong-fallback", project_id: "p1", agent_status: "blocked", waiting_for_input: true, message: "choose" },
+          { id: "a1", name: "builder", agent: "coding", agent_type: "wrong-fallback", project_id: "p1", agent_status: "blocked", waiting_for_input: true, message: "choose", session_topic: "Build feature" },
           { id: "a2", name: "idle", agent: "chat", project_id: "p1", agent_status: "idle", waiting_for_input: false },
         ],
       },
@@ -32,7 +32,7 @@ describe("HerdrClient", () => {
     });
 
     await expect(client.listAgents()).resolves.toEqual([
-      { id: "a1", name: "builder", type: "coding", projectId: "p1", status: "blocked", waitingForInput: true, bridgeUptimeSeconds: expect.any(Number), message: "choose" },
+      { id: "a1", name: "builder", type: "coding", projectId: "p1", status: "blocked", waitingForInput: true, bridgeUptimeSeconds: expect.any(Number), topic: "Build feature", message: "choose" },
       { id: "a2", name: "idle", type: "chat", projectId: "p1", status: "idle", waitingForInput: false, bridgeUptimeSeconds: expect.any(Number) },
     ]);
     await expect(client.listRequests()).resolves.toEqual([
@@ -61,6 +61,23 @@ describe("HerdrClient", () => {
       { id: 1, method: "agent.list", params: {} },
       { id: 2, method: "agent.read", params: { target: "a1", source: "recent", format: "text" } },
     ]);
+  });
+
+  test("waits until an agent reaches the requested status", async () => {
+    let calls = 0;
+    const client = new HerdrClient({
+      send: async () => JSON.stringify({ id: ++calls, result: { agents: [{ id: "a1", agent_status: calls < 2 ? "working" : "done" }] } }),
+    });
+    await expect(client.waitForAgent("a1", "done", 1000, 50)).resolves.toMatchObject({ id: "a1", status: "done" });
+    expect(calls).toBe(2);
+  });
+
+  test("times out while waiting for a status", async () => {
+    const client = new HerdrClient({ send: async (line) => {
+      const request = JSON.parse(line) as Request;
+      return JSON.stringify({ id: request.id, result: { agents: [{ id: "a1", agent_status: "working" }] } });
+    } });
+    await expect(client.waitForAgent("a1", "done", 100, 50)).rejects.toMatchObject({ code: "WAIT_TIMEOUT" });
   });
 
   test("accepts current HERDR string response IDs and agent-list envelopes", async () => {

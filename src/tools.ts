@@ -13,6 +13,7 @@ export interface ToolClient {
   denyRequest: HerdrClient["denyRequest"];
   dismissRequest: HerdrClient["dismissRequest"];
   promptAgent: HerdrClient["promptAgent"];
+  waitForAgent: HerdrClient["waitForAgent"];
 }
 
 export function createToolHandlers(client: ToolClient, config: BridgeConfig) {
@@ -26,6 +27,7 @@ export function createToolHandlers(client: ToolClient, config: BridgeConfig) {
     deny_request: ({ requestId }: { requestId: string }) => client.denyRequest(requestId),
     dismiss_request: ({ requestId }: { requestId: string }) => client.dismissRequest(requestId),
     prompt_agent: ({ agentId, text }: { agentId: string; text: string }) => client.promptAgent(agentId, text),
+    wait_for_agent: ({ agentId, status, timeoutMs, pollIntervalMs }: { agentId: string; status: string; timeoutMs?: number; pollIntervalMs?: number }) => client.waitForAgent(agentId, status, timeoutMs, pollIntervalMs),
   };
 }
 
@@ -41,6 +43,7 @@ export function createMcpServer(client: ToolClient, config: BridgeConfig): McpSe
   register(server, "deny_request", "Deny a blocked request.", toolContracts.deny_request, handlers.deny_request);
   register(server, "dismiss_request", "Dismiss a blocked request.", toolContracts.dismiss_request, handlers.dismiss_request);
   register(server, "prompt_agent", "Send bounded prompt text to an existing agent.", toolContracts.prompt_agent, handlers.prompt_agent);
+  register(server, "wait_for_agent", "Wait for an agent to reach a requested status.", toolContracts.wait_for_agent, handlers.wait_for_agent);
   return server;
 }
 
