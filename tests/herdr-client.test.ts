@@ -8,6 +8,7 @@ type Request = { id: number; method: string; params: Record<string, unknown> };
 
 function fakeClient(responses: Record<string, unknown>, requests: Request[] = []) {
   const client = new HerdrClient({
+    inspectProcesses: false,
     send: async (line) => {
       const request = JSON.parse(line) as Request;
       requests.push({ ...request, id: Number(request.id) });
@@ -66,6 +67,7 @@ describe("HerdrClient", () => {
   test("waits until an agent reaches the requested status", async () => {
     let calls = 0;
     const client = new HerdrClient({
+      inspectProcesses: false,
       send: async () => JSON.stringify({ id: ++calls, result: { agents: [{ id: "a1", agent_status: calls < 2 ? "working" : "done" }] } }),
     });
     await expect(client.waitForAgent("a1", "done", 1000, 50)).resolves.toMatchObject({ id: "a1", status: "done" });
@@ -82,6 +84,7 @@ describe("HerdrClient", () => {
 
   test("accepts current HERDR string response IDs and agent-list envelopes", async () => {
     const client = new HerdrClient({
+      inspectProcesses: false,
       send: async () => JSON.stringify({
         id: "cli:agent:list",
         result: {
@@ -108,6 +111,30 @@ describe("HerdrClient", () => {
     }]);
   });
 
+  test("surfaces a stopped foreground process as suspended", async () => {
+    const client = new HerdrClient({
+      send: async (line) => {
+        const request = JSON.parse(line) as Request;
+        if (request.method === "agent.list") return JSON.stringify({ id: request.id, result: { agents: [{ id: "a1", agent_status: "idle" }] } });
+        if (request.method === "pane.process_info") return JSON.stringify({ id: request.id, result: { process_info: { foreground_processes: [{ pid: process.pid }] } } });
+        return JSON.stringify({ id: request.id, result: {} });
+      },
+    });
+    await expect(client.listAgents()).resolves.toEqual([expect.objectContaining({ id: "a1", status: expect.stringMatching(/idle|suspended/) })]);
+  });
+
+  test("propagates native prompt errors", async () => {
+    const client = new HerdrClient({
+      send: async (line) => {
+        const request = JSON.parse(line) as Request;
+        if (request.method === "agent.list") return JSON.stringify({ id: request.id, result: { agents: [{ id: "a1", agent_status: "idle" }] } });
+        if (request.method === "pane.process_info") return JSON.stringify({ id: request.id, result: { process_info: { foreground_processes: [] } } });
+        return JSON.stringify({ id: request.id, error: { code: "agent_not_ready", message: "agent process is stopped" } });
+      },
+    });
+    await expect(client.promptAgent("a1", "hello")).rejects.toMatchObject({ code: "agent_not_ready", message: "agent process is stopped" });
+  });
+
   test("caps a HERDR response before accumulating it", async () => {
     const client = new HerdrClient({
       maxResponseBytes: 10,
@@ -130,12 +157,15 @@ describe("HerdrClient", () => {
 
     expect(requests.slice(1)).toEqual([
       { id: 2, method: "agent.prompt", params: { target: "a1", text: "2" } },
-      { id: 3, method: "agent.list", params: {} },
-      { id: 4, method: "agent.prompt", params: { target: "a1", text: "approve" } },
-      { id: 5, method: "agent.list", params: {} },
-      { id: 6, method: "agent.prompt", params: { target: "a1", text: "deny" } },
+      { id: 3, method: "agent.send_keys", params: { target: "a1", keys: ["enter"] } },
+      { id: 4, method: "agent.list", params: {} },
+      { id: 5, method: "agent.prompt", params: { target: "a1", text: "approve" } },
+      { id: 6, method: "agent.send_keys", params: { target: "a1", keys: ["enter"] } },
       { id: 7, method: "agent.list", params: {} },
-      { id: 8, method: "agent.send_keys", params: { target: "a1", keys: ["esc"] } },
+      { id: 8, method: "agent.prompt", params: { target: "a1", text: "deny" } },
+      { id: 9, method: "agent.send_keys", params: { target: "a1", keys: ["enter"] } },
+      { id: 10, method: "agent.list", params: {} },
+      { id: 11, method: "agent.send_keys", params: { target: "a1", keys: ["esc"] } },
     ]);
   });
 
@@ -151,6 +181,7 @@ describe("HerdrClient", () => {
         }],
       },
       "agent.prompt": { ok: true },
+      "agent.send_keys": { ok: true },
     });
 
     await expect(client.listRequests()).resolves.toEqual([{
@@ -162,7 +193,7 @@ describe("HerdrClient", () => {
     }]);
     await expect(client.selectRequestOption("a1", 2)).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
     await expect(client.selectRequestOption("a1", 3)).resolves.toEqual({ ok: true });
-    expect(requests.at(-1)).toEqual({ id: 4, method: "agent.prompt", params: { target: "a1", text: "3" } });
+    expect(requests.at(-1)).toEqual({ id: 5, method: "agent.send_keys", params: { target: "a1", keys: ["enter"] } });
   });
 
   test.each([0, 100, -1, 1.5])("rejects direct numeric option %s", async (option) => {
@@ -203,7 +234,7 @@ describe("HerdrClient", () => {
     const malicious = new HerdrClient({
       send: async () => JSON.stringify({ id: 1, error: { code: "SECRET", message: "/tmp/secret token=abc" } }),
     });
-    await expect(malicious.listAgents()).rejects.toMatchObject({ code: "HERDR_ERROR", message: "HERDR request failed" });
+    await expect(malicious.listAgents()).rejects.toMatchObject({ code: "SECRET", message: "/tmp/secret token=abc" });
 
     const malformed = new HerdrClient({ send: async () => "not-json" });
     await expect(malformed.listAgents()).rejects.toMatchObject({ code: "INVALID_RESPONSE", message: "HERDR returned an invalid response" });
