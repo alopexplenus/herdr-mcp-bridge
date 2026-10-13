@@ -60,13 +60,14 @@ The process loads configuration from the environment and closes the HTTP server 
 
 ## Configuration
 
+`npm run start` loads a `.env` file from the working directory if one exists (see `.env.example`); real environment variables take precedence.
+
 - `HERDR_SOCKET_PATH` identifies the running HERDR Unix socket and is required when a tool is called.
 - `HERDR_ALLOWED_PEER_ADDRESS` is required. It must be the source address of the trusted remote proxy. Localhost connections are allowed regardless of this config.
-- `HERDR_PROJECTS_ROOT` defaults to `~/projects` and must remain inside `HOME`.
+- `HERDR_PROJECTS_ROOT` has no default. It may point anywhere, but must be set explicitly. If it is unset, `list_projects` returns a `PROJECTS_NOT_CONFIGURED` error and no directory is listed.
 - `HERDR_LISTEN_HOST` defaults to `127.0.0.1`.
 - `HERDR_LISTEN_PORT` defaults to `8787`.
 - `HERDR_MAX_READ_BYTES` defaults to `65536`.
-- `HERDR_COMMAND` defaults to `herdr`.
 
 HERDR and the bridge process must have access to the same running HERDR socket. HERDR responses are capped at `min(HERDR_MAX_READ_BYTES + 65536, 1048576)` bytes.
 

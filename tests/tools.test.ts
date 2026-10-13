@@ -12,7 +12,6 @@ const config: BridgeConfig = {
   allowedPeerAddress: "127.0.0.1",
   maxReadBytes: 8,
   maxResponseBytes: 65544,
-  herdrCommand: "herdr",
 };
 
 describe("MCP tool contracts", () => {
@@ -134,4 +133,22 @@ describe("MCP tool contracts", () => {
     expect(Buffer.byteLength(result.output, "utf8")).toBeLessThanOrEqual(5);
   });
 
+  test("refuses to list projects when no projects root is configured", async () => {
+    let listed = false;
+    const { projectsRoot: _unused, ...unconfigured } = config;
+    const handlers = createToolHandlers({
+      listAgents: async () => { listed = true; return []; },
+      readAgent: async () => ({}),
+      listRequests: async () => [],
+      selectRequestOption: async () => ({}),
+      approveRequest: async () => ({}),
+      denyRequest: async () => ({}),
+      dismissRequest: async () => ({}),
+      promptAgent: async () => ({}),
+      waitForAgent: async () => ({ id: "a", name: "a", projectId: "p", type: "t", status: "idle", waitingForInput: false, bridgeUptimeSeconds: 0 }),
+    }, unconfigured);
+
+    await expect(handlers.list_projects()).rejects.toMatchObject({ code: "PROJECTS_NOT_CONFIGURED" });
+    expect(listed).toBe(false);
+  });
 });

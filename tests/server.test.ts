@@ -10,7 +10,6 @@ const config: BridgeConfig = {
   allowedPeerAddress: "127.0.0.1",
   maxReadBytes: 128,
   maxResponseBytes: 65664,
-  herdrCommand: "herdr",
 };
 
 const client = {

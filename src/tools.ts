@@ -18,7 +18,10 @@ export interface ToolClient {
 
 export function createToolHandlers(client: ToolClient, config: BridgeConfig) {
   return {
-    list_projects: async () => discoverProjects(config.projectsRoot, await client.listAgents()),
+    list_projects: async () => {
+      if (!config.projectsRoot) throw new HerdrError("PROJECTS_NOT_CONFIGURED", "HERDR_PROJECTS_ROOT is not configured");
+      return discoverProjects(config.projectsRoot, await client.listAgents());
+    },
     list_agents: () => client.listAgents(),
     read_agent: async ({ agentId }: { agentId: string }) => boundedRead(agentId, await client.readAgent(agentId), config.maxReadBytes),
     list_requests: () => client.listRequests(),

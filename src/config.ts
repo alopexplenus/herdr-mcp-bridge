@@ -2,13 +2,12 @@ import os from "node:os";
 import path from "node:path";
 
 export interface BridgeConfig {
-  projectsRoot: string;
+  projectsRoot?: string;
   listenHost: string;
   listenPort: number;
   allowedPeerAddress: string;
   maxReadBytes: number;
   maxResponseBytes: number;
-  herdrCommand: string;
 }
 
 function requiredEnvironment(env: NodeJS.ProcessEnv, name: string): string {
@@ -45,22 +44,16 @@ function expandHome(value: string, home: string): string {
 
 export function loadConfig(env: NodeJS.ProcessEnv): BridgeConfig {
   const home = path.resolve(env.HOME || os.homedir());
-  const projectsRoot = path.resolve(
-    expandHome(env.HERDR_PROJECTS_ROOT || "~/projects", home),
-  );
-
-  if (projectsRoot !== home && !projectsRoot.startsWith(`${home}${path.sep}`)) {
-    throw new Error("HERDR_PROJECTS_ROOT must be inside HOME");
-  }
+  const configuredRoot = env.HERDR_PROJECTS_ROOT?.trim();
+  const projectsRoot = configuredRoot ? path.resolve(expandHome(configuredRoot, home)) : undefined;
 
   const maxReadBytes = parseMaxReadBytes(env.HERDR_MAX_READ_BYTES);
   return {
-    projectsRoot,
     listenHost: env.HERDR_LISTEN_HOST?.trim() || "127.0.0.1",
     listenPort: parsePort(env.HERDR_LISTEN_PORT),
     allowedPeerAddress: requiredEnvironment(env, "HERDR_ALLOWED_PEER_ADDRESS"),
     maxReadBytes,
     maxResponseBytes: Math.min(maxReadBytes + 65536, 1048576),
-    herdrCommand: env.HERDR_COMMAND?.trim() || "herdr",
+    ...(projectsRoot !== undefined ? { projectsRoot } : {}),
   };
 }

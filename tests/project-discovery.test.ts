@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, test } from "vitest";
 import { discoverProjects, type AgentSummary, type ProjectSummary } from "../src/project-discovery.js";
 
@@ -48,8 +48,16 @@ describe("discoverProjects", () => {
     expect(projects.find((project) => project.id === "alpha")?.agentIds).toEqual([]);
   });
 
-  test("rejects a discovery root outside ~/projects", async () => {
-    expect(() => discoverProjects(os.tmpdir(), [])).toThrow(/projects/i);
+  test("accepts a discovery root outside HOME", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "herdr-outside-"));
+    roots.push(root);
+    await mkdir(path.join(root, "alpha"));
+
+    expect(discoverProjects(root, []).map((project) => project.id)).toEqual(["alpha"]);
+  });
+
+  test("rejects a missing discovery root", () => {
+    expect(() => discoverProjects(path.join(os.tmpdir(), `herdr-missing-${process.pid}`), [])).toThrow(/not accessible/);
   });
 
   test("allows direct-child names beginning with ..", async () => {
@@ -62,14 +70,4 @@ describe("discoverProjects", () => {
     ]);
   });
 
-  test("rejects a symlinked root that resolves outside ~/projects", async () => {
-    const root = await temporaryProjectsRoot();
-    roots.push(root);
-    const outside = await mkdtemp(path.join(os.tmpdir(), "herdr-outside-"));
-    roots.push(outside);
-    const link = path.join(root, "link");
-    await symlink(outside, link, "dir");
-
-    expect(() => discoverProjects(link, [])).toThrow(/projects/i);
-  });
 });

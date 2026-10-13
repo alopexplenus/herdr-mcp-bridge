@@ -8,7 +8,6 @@ const completeEnvironment = {
   HERDR_LISTEN_HOST: "0.0.0.0",
   HERDR_LISTEN_PORT: "9000",
   HERDR_MAX_READ_BYTES: "1024",
-  HERDR_COMMAND: "herdr-dev",
 };
 
 describe("loadConfig", () => {
@@ -16,14 +15,22 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ HOME: "/home/bridge" })).toThrow(/HERDR_ALLOWED_PEER_ADDRESS/);
   });
 
-  test("rejects a projects root outside the configured home directory", () => {
-    expect(() =>
-      loadConfig({
-        HOME: "/home/bridge",
-        HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3",
-        HERDR_PROJECTS_ROOT: "/tmp/projects",
-      }),
-    ).toThrow(/HERDR_PROJECTS_ROOT/);
+  test("accepts an explicit projects root outside the home directory", () => {
+    expect(loadConfig({
+      HOME: "/home/bridge",
+      HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3",
+      HERDR_PROJECTS_ROOT: "/srv/projects",
+    }).projectsRoot).toBe("/srv/projects");
+  });
+
+  test("leaves the projects root unset unless explicitly configured", () => {
+    const config = loadConfig({ HOME: "/home/bridge", HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3" });
+    expect(config.projectsRoot).toBeUndefined();
+    expect(loadConfig({ HOME: "/home/bridge", HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3", HERDR_PROJECTS_ROOT: "  " }).projectsRoot).toBeUndefined();
+  });
+
+  test("expands a home-relative projects root", () => {
+    expect(loadConfig({ ...completeEnvironment, HERDR_PROJECTS_ROOT: "~/code" }).projectsRoot).toBe("/home/bridge/code");
   });
 
   test("rejects a port outside the valid range", () => {
@@ -63,7 +70,6 @@ describe("loadConfig", () => {
       allowedPeerAddress: "100.64.1.3",
       maxReadBytes: 1024,
       maxResponseBytes: 66560,
-      herdrCommand: "herdr-dev",
     });
   });
 });

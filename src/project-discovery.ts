@@ -1,4 +1,3 @@
-import os from "node:os";
 import path from "node:path";
 import { accessSync, readdirSync, realpathSync } from "node:fs";
 
@@ -16,23 +15,12 @@ export interface ProjectSummary {
   agentIds: string[];
 }
 
-function isWithinRoot(root: string, candidate: string): boolean {
-  const relative = path.relative(root, candidate);
-  return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
-}
-
 export function discoverProjects(root: string, agents: AgentSummary[]): ProjectSummary[] {
-  const resolvedRoot = path.resolve(root);
   let realRoot: string;
-  let realProjectsRoot: string;
   try {
-    realRoot = realpathSync(resolvedRoot);
-    realProjectsRoot = realpathSync(path.resolve(os.homedir(), "projects"));
+    realRoot = realpathSync(path.resolve(root));
   } catch {
-    throw new Error("project discovery root must be inside ~/projects");
-  }
-  if (!isWithinRoot(path.resolve(os.homedir(), "projects"), realProjectsRoot) || !isWithinRoot(realProjectsRoot, realRoot)) {
-    throw new Error("project discovery root must be inside ~/projects");
+    throw new Error("project discovery root is not accessible");
   }
 
   const entries = readdirSync(realRoot, { withFileTypes: true });

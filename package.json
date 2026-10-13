@@ -4,16 +4,17 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
   "scripts": {
     "build": "tsc --noEmit false",
     "test": "vitest run",
     "check": "tsc --noEmit",
-    "start": "node dist/src/main.js"
+    "start": "node --env-file-if-exists=.env dist/src/main.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
