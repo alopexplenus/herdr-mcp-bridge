@@ -9,6 +9,7 @@ export interface AgentSummary {
   waitingForInput: boolean;
   bridgeUptimeSeconds: number;
   topic?: string;
+  cwd?: string;
   message?: string;
   metadata?: Record<string, string>;
   options?: number[];
@@ -239,7 +240,8 @@ function parseAgent(value: unknown, bridgeUptimeSeconds: number): AgentSummary {
   const type = typeof value.agent === "string" ? value.agent : typeof value.agent_type === "string" ? value.agent_type : typeof value.type === "string" ? value.type : "unknown";
   const waitingForInput = typeof value.waiting_for_input === "boolean" ? value.waiting_for_input : typeof value.waitingForInput === "boolean" ? value.waitingForInput : value.agent_status === "blocked";
   const message = typeof value.message === "string" ? value.message : undefined;
-  const topic = firstString(value.topic, value.session_topic, value.sessionTopic, isRecord(value.metadata) ? value.metadata.topic : undefined, isRecord(value.metadata) ? value.metadata.session_topic : undefined);
+  const topic = firstString(value.topic, value.session_topic, value.sessionTopic, isRecord(value.metadata) ? value.metadata.topic : undefined, isRecord(value.metadata) ? value.metadata.session_topic : undefined, cleanTitle(value.terminal_title_stripped));
+  const cwd = firstString(value.cwd, value.foreground_cwd);
   const metadata: Record<string, string> | undefined = isRecord(value.metadata)
     ? Object.entries(value.metadata).filter(([key, item]) => key.length <= 64 && typeof item === "string" && item.length <= 256).slice(0, 16)
       .reduce<Record<string, string>>((result, [key, item]) => {
@@ -249,7 +251,12 @@ function parseAgent(value: unknown, bridgeUptimeSeconds: number): AgentSummary {
     : undefined;
   const name = typeof value.name === "string" ? value.name : id;
   const options = parseOptions(value.options) ?? parseOptions(isRecord(value.metadata) ? value.metadata.options : undefined) ?? parseMessageOptions(value.message);
-  return { id, name, type, projectId, status: value.agent_status, waitingForInput, bridgeUptimeSeconds, ...(topic ? { topic } : {}), ...(message ? { message } : {}), ...(metadata && Object.keys(metadata).length ? { metadata } : {}), ...(options ? { options } : {}) };
+  return { id, name, type, projectId, status: value.agent_status, waitingForInput, bridgeUptimeSeconds, ...(topic ? { topic } : {}), ...(cwd ? { cwd } : {}), ...(message ? { message } : {}), ...(metadata && Object.keys(metadata).length ? { metadata } : {}), ...(options ? { options } : {}) };
+}
+
+// opencode prefixes its session titles with "OC | "
+function cleanTitle(value: unknown): string | undefined {
+  return typeof value === "string" ? value.replace(/^OC \|\s*/, "") : undefined;
 }
 
 function firstString(...values: unknown[]): string | undefined {

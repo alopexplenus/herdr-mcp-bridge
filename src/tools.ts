@@ -1,6 +1,7 @@
+import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { HerdrError, type HerdrClient } from "./herdr-client.js";
-import { discoverProjects } from "./project-discovery.js";
+import { agentProject, discoverProjects } from "./project-discovery.js";
 import type { BridgeConfig } from "./config.js";
 import { toolContracts } from "./tool-contract.js";
 
@@ -20,9 +21,19 @@ export function createToolHandlers(client: ToolClient, config: BridgeConfig) {
   return {
     list_projects: async () => {
       if (!config.projectsRoot) throw new HerdrError("PROJECTS_NOT_CONFIGURED", "HERDR_PROJECTS_ROOT is not configured");
-      return discoverProjects(config.projectsRoot, await client.listAgents());
+      return discoverProjects(config.projectsRoot);
     },
-    list_agents: () => client.listAgents(),
+    list_agents: async () => {
+      const agents = await client.listAgents();
+      return agents.map((agent) => ({
+        id: agent.id,
+        project: config.projectsRoot ? agentProject(agent, config.projectsRoot) : agent.cwd ? path.basename(agent.cwd) : null,
+        type: agent.type,
+        status: agent.status,
+        topic: agent.topic ?? null,
+        ...(agent.status === "blocked" && agent.message ? { message: agent.message } : {}),
+      }));
+    },
     read_agent: async ({ agentId }: { agentId: string }) => boundedRead(agentId, await client.readAgent(agentId), config.maxReadBytes),
     list_requests: () => client.listRequests(),
     select_request_option: ({ requestId, option }: { requestId: string; option: number }) => client.selectRequestOption(requestId, option),
@@ -37,8 +48,8 @@ export function createToolHandlers(client: ToolClient, config: BridgeConfig) {
 export function createMcpServer(client: ToolClient, config: BridgeConfig): McpServer {
   const server = new McpServer({ name: "herdr-mcp-bridge", version: "0.1.0" });
   const handlers = createToolHandlers(client, config);
-  register(server, "list_projects", "List discovered projects and their agents.", toolContracts.list_projects, handlers.list_projects);
-  register(server, "list_agents", "List available HERDR agents.", toolContracts.list_agents, handlers.list_agents);
+  register(server, "list_projects", "List project names: the directories under the projects root.", toolContracts.list_projects, handlers.list_projects);
+  register(server, "list_agents", "List HERDR agents, each with id, project (directory name), type (claude/opencode), status, and topic (conversation/session title).", toolContracts.list_agents, handlers.list_agents);
   register(server, "read_agent", "Read bounded output from an existing agent.", toolContracts.read_agent, handlers.read_agent);
   register(server, "list_requests", "List blocked HERDR requests.", toolContracts.list_requests, handlers.list_requests);
   register(server, "select_request_option", "Select an option on a blocked request.", toolContracts.select_request_option, handlers.select_request_option);

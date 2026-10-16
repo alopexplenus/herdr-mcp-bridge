@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, test } from "vitest";
-import { discoverProjects, type AgentSummary, type ProjectSummary } from "../src/project-discovery.js";
+import { agentProject, discoverProjects } from "../src/project-discovery.js";
 
 const roots: string[] = [];
 
@@ -16,36 +16,15 @@ afterEach(async () => {
 });
 
 describe("discoverProjects", () => {
-  test("lists only immediate child directories and their git status", async () => {
+  test("lists only immediate child directory names, sorted", async () => {
     const root = await temporaryProjectsRoot();
     roots.push(root);
-    await mkdir(path.join(root, "git-project", ".git"), { recursive: true });
-    await mkdir(path.join(root, "plain-project"));
-    await mkdir(path.join(root, "git-project", "nested", ".git"), { recursive: true });
+    await mkdir(path.join(root, "zeta", ".git"), { recursive: true });
+    await mkdir(path.join(root, "alpha"));
+    await mkdir(path.join(root, "zeta", "nested"));
     await writeFile(path.join(root, "not-a-directory"), "file");
 
-    const projects: ProjectSummary[] = discoverProjects(root, []);
-
-    expect(projects).toEqual([
-      { id: "git-project", name: "git-project", path: path.join(root, "git-project"), isGit: true, agentIds: [] },
-      { id: "plain-project", name: "plain-project", path: path.join(root, "plain-project"), isGit: false, agentIds: [] },
-    ]);
-  });
-
-  test("associates agents by project identifier rather than filesystem paths", async () => {
-    const root = await temporaryProjectsRoot();
-    roots.push(root);
-    await mkdir(path.join(root, "alpha"));
-    await mkdir(path.join(root, "beta"));
-    const agents: AgentSummary[] = [
-      { id: "a1", name: "one", projectId: "beta" },
-      { id: "a2", name: "two", projectId: "not-a-path" },
-    ];
-
-    const projects = discoverProjects(root, agents);
-
-    expect(projects.find((project) => project.id === "beta")?.agentIds).toEqual(["a1"]);
-    expect(projects.find((project) => project.id === "alpha")?.agentIds).toEqual([]);
+    expect(discoverProjects(root)).toEqual(["alpha", "zeta"]);
   });
 
   test("accepts a discovery root outside HOME", async () => {
@@ -53,11 +32,11 @@ describe("discoverProjects", () => {
     roots.push(root);
     await mkdir(path.join(root, "alpha"));
 
-    expect(discoverProjects(root, []).map((project) => project.id)).toEqual(["alpha"]);
+    expect(discoverProjects(root)).toEqual(["alpha"]);
   });
 
   test("rejects a missing discovery root", () => {
-    expect(() => discoverProjects(path.join(os.tmpdir(), `herdr-missing-${process.pid}`), [])).toThrow(/not accessible/);
+    expect(() => discoverProjects(path.join(os.tmpdir(), `herdr-missing-${process.pid}`))).toThrow(/not accessible/);
   });
 
   test("allows direct-child names beginning with ..", async () => {
@@ -65,9 +44,16 @@ describe("discoverProjects", () => {
     roots.push(root);
     await mkdir(path.join(root, "..fixture"));
 
-    expect(discoverProjects(root, [])).toEqual([
-      { id: "..fixture", name: "..fixture", path: path.join(root, "..fixture"), isGit: false, agentIds: [] },
-    ]);
+    expect(discoverProjects(root)).toEqual(["..fixture"]);
   });
+});
 
+describe("agentProject", () => {
+  test("uses the project directory containing the agent cwd", async () => {
+    const root = await temporaryProjectsRoot();
+    roots.push(root);
+    const agent = { projectId: "wX", cwd: path.join(root, "beta", "sub") };
+    expect(agentProject(agent, root)).toBe("beta");
+    expect(agentProject({ ...agent, cwd: "/elsewhere/other" }, root)).toBe("other");
+  });
 });

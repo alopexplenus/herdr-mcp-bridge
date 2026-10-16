@@ -1,21 +1,7 @@
 import path from "node:path";
-import { accessSync, readdirSync, realpathSync } from "node:fs";
+import { readdirSync, realpathSync } from "node:fs";
 
-export interface AgentSummary {
-  id: string;
-  name: string;
-  projectId: string;
-}
-
-export interface ProjectSummary {
-  id: string;
-  name: string;
-  path: string;
-  isGit: boolean;
-  agentIds: string[];
-}
-
-export function discoverProjects(root: string, agents: AgentSummary[]): ProjectSummary[] {
+export function discoverProjects(root: string): string[] {
   let realRoot: string;
   try {
     realRoot = realpathSync(path.resolve(root));
@@ -24,23 +10,20 @@ export function discoverProjects(root: string, agents: AgentSummary[]): ProjectS
   }
 
   const entries = readdirSync(realRoot, { withFileTypes: true });
-  const projects: ProjectSummary[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const projectPath = path.join(realRoot, entry.name);
-    let isGit = true;
-    try {
-      accessSync(path.join(projectPath, ".git"));
-    } catch {
-      isGit = false;
-    }
-    projects.push({
-      id: entry.name,
-      name: entry.name,
-      path: projectPath,
-      isGit,
-      agentIds: agents.filter((agent) => agent.projectId === entry.name).map((agent) => agent.id),
-    });
-  }
-  return projects.sort((left, right) => left.name.localeCompare(right.name));
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+/** Project name for an agent: the first directory under the projects root containing its cwd, else the cwd's basename. */
+export function agentProject(agent: { cwd?: string; projectId?: string }, root: string): string | null {
+  if (!agent.cwd) return agent.projectId || null;
+  let realRoot = root;
+  try {
+    realRoot = realpathSync(path.resolve(root));
+  } catch {}
+  const relative = path.relative(realRoot, path.resolve(agent.cwd));
+  if (relative && !relative.startsWith("..") && !path.isAbsolute(relative)) return relative.split(path.sep)[0];
+  return path.basename(agent.cwd) || null;
 }

@@ -32,7 +32,7 @@ Request flow: `main.ts` → `server.ts` (HTTP + auth + pre-validation) → `tool
   - HERDR methods used: `agent.list`, `agent.read`, `agent.prompt`, `agent.send_keys`.
   - `parseAgent` normalizes several alternative field spellings (`id`/`pane_id`, `project_id`/`projectId`/`workspace_id`, topic in metadata, and so on) into `AgentSummary`.
 - **"Requests" are not a separate HERDR concept.** A request is an agent with `status === "blocked"`, and `requestId` is the agent ID. approve/deny/select send text via `agent.prompt` (`"approve"`, `"deny"`, `"<n>"`). dismiss sends the `esc` key. Every action first re-lists agents to check that the target exists and is blocked.
-- **`project-discovery.ts`** lists the directories under `projectsRoot` and matches agents to them by `agent.projectId === dirName`. `HERDR_PROJECTS_ROOT` has no default: when it is unset, `list_projects` fails with `PROJECTS_NOT_CONFIGURED` rather than listing anything. There is no location restriction on the root, only the requirement that it be set explicitly.
+- **`project-discovery.ts`** lists the directories under `projectsRoot` (names only, like `ls`). `agentProject` derives an agent's project name from its `cwd` (first directory under the root, else the cwd basename); `list_agents` uses it. `HERDR_PROJECTS_ROOT` has no default: when it is unset, `list_projects` fails with `PROJECTS_NOT_CONFIGURED` rather than listing anything. There is no location restriction on the root, only the requirement that it be set explicitly.
 
 ## Gotchas
 
