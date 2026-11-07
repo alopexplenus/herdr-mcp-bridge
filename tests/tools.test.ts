@@ -10,6 +10,7 @@ const config: BridgeConfig = {
   listenHost: "127.0.0.1",
   listenPort: 8787,
   allowedPeerAddress: "127.0.0.1",
+  sharedSecret: "0123456789abcdef0123456789abcdef",
   maxReadBytes: 8,
   maxResponseBytes: 65544,
 };

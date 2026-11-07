@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { loadConfig } from "../src/config.js";
 
+const SECRET = "0123456789abcdef0123456789abcdef";
+
 const completeEnvironment = {
+  HERDR_SHARED_SECRET: SECRET,
   HOME: "/home/bridge",
   HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3",
   HERDR_PROJECTS_ROOT: "/home/bridge/projects",
@@ -19,25 +22,39 @@ describe("loadConfig", () => {
     expect(loadConfig({
       HOME: "/home/bridge",
       HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3",
+      HERDR_SHARED_SECRET: SECRET,
       HERDR_PROJECTS_ROOT: "/srv/projects",
     }).projectsRoot).toBe("/srv/projects");
   });
 
   test("leaves the projects root unset unless explicitly configured", () => {
-    const config = loadConfig({ HOME: "/home/bridge", HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3" });
+    const config = loadConfig({ HOME: "/home/bridge", HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3", HERDR_SHARED_SECRET: SECRET });
     expect(config.projectsRoot).toBeUndefined();
-    expect(loadConfig({ HOME: "/home/bridge", HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3", HERDR_PROJECTS_ROOT: "  " }).projectsRoot).toBeUndefined();
+    expect(loadConfig({ HOME: "/home/bridge", HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3", HERDR_SHARED_SECRET: SECRET, HERDR_PROJECTS_ROOT: "  " }).projectsRoot).toBeUndefined();
   });
 
   test("expands a home-relative projects root", () => {
     expect(loadConfig({ ...completeEnvironment, HERDR_PROJECTS_ROOT: "~/code" }).projectsRoot).toBe("/home/bridge/code");
   });
 
+  test("requires a shared secret", () => {
+    expect(() => loadConfig({ ...completeEnvironment, HERDR_SHARED_SECRET: undefined })).toThrow(/HERDR_SHARED_SECRET must be supplied/);
+    expect(() => loadConfig({ ...completeEnvironment, HERDR_SHARED_SECRET: "   " })).toThrow(/HERDR_SHARED_SECRET/);
+  });
+
+  test.each(["short", "changeme-changeme-changeme-changeme", "a".repeat(40)])(
+    "rejects a weak shared secret: %s",
+    (secret) => {
+      expect(() => loadConfig({ ...completeEnvironment, HERDR_SHARED_SECRET: secret })).toThrow(/HERDR_SHARED_SECRET/);
+    },
+  );
+
   test("rejects a port outside the valid range", () => {
     expect(() =>
       loadConfig({
         HOME: "/home/bridge",
         HERDR_ALLOWED_PEER_ADDRESS: "100.64.1.3",
+        HERDR_SHARED_SECRET: SECRET,
         HERDR_LISTEN_PORT: "65536",
       }),
     ).toThrow(/port/i);
@@ -68,6 +85,7 @@ describe("loadConfig", () => {
       listenHost: "0.0.0.0",
       listenPort: 9000,
       allowedPeerAddress: "100.64.1.3",
+      sharedSecret: SECRET,
       maxReadBytes: 1024,
       maxResponseBytes: 66560,
     });

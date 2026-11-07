@@ -13,6 +13,7 @@ Run the bridge on the same machine as HERDR. The bridge listens on loopback, whi
 npm install
 npm run build
 
+export HERDR_SHARED_SECRET=...           # required; any local client must send it as a bearer token
 export HERDR_SOCKET_PATH=/path/to/herdr.sock
 export HERDR_LISTEN_HOST=127.0.0.1
 export HERDR_LISTEN_PORT=8787
@@ -25,7 +26,7 @@ Configure the client's MCP server URL as:
 http://127.0.0.1:8787/mcp
 ```
 
-`HERDR_SOCKET_PATH` must point to the socket used by the running HERDR process. The bridge accepts local requests without an additional proxy.
+`HERDR_SOCKET_PATH` must point to the socket used by the running HERDR process. The bridge accepts local requests without an additional proxy, but the client must send `Authorization: Bearer $HERDR_SHARED_SECRET` (for Claude Code: `claude mcp add --transport http herdr http://127.0.0.1:8787/mcp --header "Authorization: Bearer $HERDR_SHARED_SECRET"`).
 
 ### 2. Claude Mobile through a public HTTPS endpoint
 
@@ -35,6 +36,7 @@ Bring your own OAuth. I tested with <https://github.com/sigbit/mcp-auth-proxy>
 ```sh
 
 export HERDR_ALLOWED_PEER_ADDRESS=x.x.x.x # proxy address
+export HERDR_SHARED_SECRET=...           # same value as the proxy's --proxy-bearer-token
 export HERDR_SOCKET_PATH=/path/to/herdr.sock
 export HERDR_LISTEN_HOST=127.0.0.1
 export HERDR_LISTEN_PORT=8787
@@ -64,6 +66,7 @@ The process loads configuration from the environment and closes the HTTP server 
 
 - `HERDR_SOCKET_PATH` identifies the running HERDR Unix socket and is required when a tool is called.
 - `HERDR_ALLOWED_PEER_ADDRESS` is required. It must be the source address of the trusted remote proxy. Localhost connections are allowed regardless of this config.
+- `HERDR_SHARED_SECRET` is required: a random token of at least 32 characters (`openssl rand -hex 32`). Every `/mcp` request must send it as `Authorization: Bearer <secret>`, on top of the peer-address check. Set the proxy's `--proxy-bearer-token` to the same value.
 - `HERDR_PROJECTS_ROOT` has no default. It may point anywhere, but must be set explicitly. If it is unset, `list_projects` returns a `PROJECTS_NOT_CONFIGURED` error and no directory is listed.
 - `HERDR_LISTEN_HOST` defaults to `127.0.0.1`.
 - `HERDR_LISTEN_PORT` defaults to `8787`.
@@ -74,7 +77,7 @@ HERDR and the bridge process must have access to the same running HERDR socket. 
 ## Endpoints
 
 - `GET /health` returns a private service health response and does not query agent data.
-- `POST /mcp` accepts MCP Streamable HTTP requests from localhost or the configured trusted peer.
+- `POST /mcp` accepts MCP Streamable HTTP requests from localhost or the configured trusted peer, and only with the correct `Authorization: Bearer` header (otherwise `401`).
 
 ## Supported Tools
 
