@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { BridgeConfig } from "./config.js";
@@ -22,6 +23,11 @@ export function createBridgeServer(client: ToolClient, config: BridgeConfig, log
       }
       if (!authorized(req.socket.remoteAddress, config.allowedPeerAddress)) {
         res.writeHead(401, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      if (!hasValidBearer(req.headers.authorization, config.sharedSecret)) {
+        res.writeHead(401, { "content-type": "application/json", "www-authenticate": "Bearer" });
         res.end(JSON.stringify({ error: "unauthorized" }));
         return;
       }
@@ -168,4 +174,12 @@ function authorized(remoteAddress: string | undefined, allowedPeerAddress: strin
     || remoteAddress === "::ffff:127.0.0.1"
     || remoteAddress === allowedPeerAddress
     || remoteAddress === `::ffff:${allowedPeerAddress}`;
+}
+
+function hasValidBearer(header: string | undefined, secret: string): boolean {
+  const match = typeof header === "string" ? /^bearer +(\S+)$/i.exec(header) : null;
+  // Compare fixed-length digests so neither the length nor the content of the secret leaks through timing.
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  const matches = timingSafeEqual(digest(match?.[1] ?? ""), digest(secret));
+  return match !== null && matches;
 }

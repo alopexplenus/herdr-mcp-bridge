@@ -6,6 +6,7 @@ export interface BridgeConfig {
   listenHost: string;
   listenPort: number;
   allowedPeerAddress: string;
+  sharedSecret: string;
   maxReadBytes: number;
   maxResponseBytes: number;
 }
@@ -13,6 +14,20 @@ export interface BridgeConfig {
 function requiredEnvironment(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name]?.trim();
   if (!value) throw new Error(`${name} must be supplied`);
+  return value;
+}
+
+const MIN_SECRET_LENGTH = 32;
+const PLACEHOLDERS = ["changeme", "change-me", "change_me", "replace", "example", "your-secret", "your_secret", "secret"];
+
+function parseSharedSecret(env: NodeJS.ProcessEnv): string {
+  const value = requiredEnvironment(env, "HERDR_SHARED_SECRET");
+  if (value.length < MIN_SECRET_LENGTH) {
+    throw new Error(`HERDR_SHARED_SECRET must be at least ${MIN_SECRET_LENGTH} characters`);
+  }
+  if (PLACEHOLDERS.some((p) => value.toLowerCase().includes(p)) || new Set(value).size < 8) {
+    throw new Error("HERDR_SHARED_SECRET looks like a placeholder; generate a random one (e.g. openssl rand -hex 32)");
+  }
   return value;
 }
 
@@ -52,6 +67,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): BridgeConfig {
     listenHost: env.HERDR_LISTEN_HOST?.trim() || "127.0.0.1",
     listenPort: parsePort(env.HERDR_LISTEN_PORT),
     allowedPeerAddress: requiredEnvironment(env, "HERDR_ALLOWED_PEER_ADDRESS"),
+    sharedSecret: parseSharedSecret(env),
     maxReadBytes,
     maxResponseBytes: Math.min(maxReadBytes + 65536, 1048576),
     ...(projectsRoot !== undefined ? { projectsRoot } : {}),
